@@ -1,3 +1,3 @@
 # NetworkCore
 
-A description of this package.
+A SPM module of network for create mini projects
