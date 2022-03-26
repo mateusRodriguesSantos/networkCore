@@ -1,5 +1,5 @@
 //
-//  NetworkProtocol.swift
+//  NetworkTasks.swift
 //  
 //
 //  Created by Mateus Rodrigues on 23/03/22.
@@ -8,14 +8,22 @@
 import Foundation
 import Network
 
-public protocol NetworkProtocol {
+internal protocol NetworkProtocol {
     associatedtype T: Decodable
     func execute(connection: ConnectionProtocol, completion: @escaping (Result<T?, ErrorsRequests>) -> Void)
     func executeWithParams(connection: ConnectionProtocol, completion: @escaping (Result<T?, ErrorsRequests>) -> Void)
     func decode(_ data: Data, completion: @escaping (T?) -> Void)
 }
 
-extension NetworkProtocol {
+public struct NetworkTasks<DecodeType: Codable>: NetworkProtocol {
+    
+    public typealias T = DecodeType
+    
+    private var client: URLSession
+    
+    public init(client: URLSession = URLSession.shared) {
+        self.client = client
+    }
     
     public func execute(connection: ConnectionProtocol, completion: @escaping (Result<T?, ErrorsRequests>) -> Void) {
         
@@ -34,7 +42,7 @@ extension NetworkProtocol {
             return
         }
 
-        let task = URLSession.shared.dataTask(with: url) { (data, response, error) in
+        let task = client.dataTask(with: url) { (data, response, error) in
 
             if let error = error {
                 completion(.failure(.error(error: "\(error)")))
@@ -61,7 +69,7 @@ extension NetworkProtocol {
     
     public func executeWithParams(connection: ConnectionProtocol, completion: @escaping (Result<T?, ErrorsRequests>) -> Void) {
         if let request = getRequest(connection: connection) {
-            let task = URLSession.shared.dataTask(with: request) { (data: Data?, response: URLResponse?, error: Error?) -> Void in
+            let task = client.dataTask(with: request) { (data: Data?, response: URLResponse?, error: Error?) -> Void in
                 if error != nil {
                     completion(.failure(.error(error: "\(String(describing: error))")))
                 }
@@ -86,11 +94,11 @@ extension NetworkProtocol {
             }
             task.resume()
         } else {
-            completion(.failure(.lostConnection))
+            completion(.failure(.error(error: "Not have connection object")))
         }
     }
     
-    public func decode(_ data: Data, completion: @escaping (T?) -> Void) {
+    internal func decode(_ data: Data, completion: @escaping (T?) -> Void) {
         do {
             if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
                     print(json)
@@ -102,7 +110,7 @@ extension NetworkProtocol {
         }
     }
     
-    private func getRequest(connection: ConnectionProtocol) -> URLRequest? {
+    internal func getRequest(connection: ConnectionProtocol) -> URLRequest? {
         let components = URLComponents(url: connection.baseUrl.appendingPathComponent(connection.router), resolvingAgainstBaseURL: true)
         guard let url = components?.url else {
             return nil
